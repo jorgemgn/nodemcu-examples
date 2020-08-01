@@ -1,0 +1,49 @@
+name: Compile and verify sketches
+
+on: [push]
+
+jobs: 
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1.0.0
+        with:
+          version: '0.10.0'
+
+      - name: Install platform
+        run: |
+          arduino-cli config init
+          echo "
+          board_manager:
+            additional_urls:
+              - http://arduino.esp8266.com/stable/package_esp8266com_index.json
+          " > arduino-cli.yaml
+          arduino-cli core update-index
+          arduino-cli core install esp8266:esp8266
+
+      - name: Install libraries
+        run: |
+          # Install well known libraries
+          arduino-cli lib install \
+            "Adafruit BMP280 Library" \
+            "PubSubClient" \
+            "DHT sensor library"
+
+          # Install custom libraries
+          # LiquidCrystal_I2C lib
+          curl -Lkso liquidcrystal.zip https://github.com/lucasmaziero/LiquidCrystal_I2C/archive/master.zip
+          unzip liquidcrystal.zip -d ~/Arduino/libraries
+          rm -f liquidcrystal.zip
+
+      - name: Compile sketches
+        run: |
+          for i in `find . -name "*.ino" -type f`; do
+            cp "$i" "/tmp/sketch.ino"
+            arduino-cli compile --verify --fqbn esp8266:esp8266:nodemcu "/tmp/sketch.ino" -o "/tmp/sketch.bin"
+            rm -f "/tmp/sketch.ino" "/tmp/sketch.bin"
+          done
+          
